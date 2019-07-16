@@ -15,8 +15,10 @@ class LinebotController < ApplicationController
 
   def callback
     body = request.body.read
-
+    #postされたjson形式の文字列を取得する
+    puts body
     signature = request.env['HTTP_X_LINE_SIGNATURE']
+
     unless client.validate_signature(body, signature)
       head :bad_request
     end
