@@ -38,17 +38,13 @@ class LinebotController < ApplicationController
       hash_result = JSON.parse json_result
 
       if hash_result["error"]
-        response = "#{address}駅付近にwifiと電源があるカフェがございません"
+        response = "#{address}付近にwifiと電源があるカフェがございません"
       end
 
       if hash_result["rest"] #ここでお店情報が入った配列となる
         cafes = hash_result["rest"]
-        cafe = cafes.sample
-
-        until cafe["access"]["station"].include?(address)
-          cafe = cafes.sample
-        end
-
+        cafe_shuffles = cafes.shuffle
+        cafe = cafe_shuffles.sample
 
         cafe_name = cafe["name"]
         cafe_url = cafe["url_mobile"]
