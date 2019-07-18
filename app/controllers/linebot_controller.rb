@@ -33,7 +33,7 @@ class LinebotController < ApplicationController
       # area_result = `curl -X GET https://api.gnavi.co.jp/RestSearchAPI/v3/?keyid=52d46e2c5dcf3ceb3925d5fa4ec7615b&address=#{URI.encode(address)}&outret=1&wifi=1&freeword=#{URI.encode('カフェ')}`  #ここでぐるなびAPIを叩く
 
       key_id = ENV['ACCESS_KEY']
-      area_result = URI.parse("https://api.gnavi.co.jp/RestSearchAPI/v3/?keyid=#{key_id}&address=#{URI.encode(address)}&outret=1&wifi=1&freeword=#{URI.encode('カフェ')}")
+      area_result = URI.parse("https://api.gnavi.co.jp/RestSearchAPI/v3/?keyid=#{key_id}&address=#{URI.encode(address)}&wifi=1&freeword=#{URI.encode('カフェ')}")
       json_result = Net::HTTP.get(area_result)
       hash_result = JSON.parse json_result
 
@@ -49,8 +49,10 @@ class LinebotController < ApplicationController
           cafe = cafes.sample
         end
 
+
         cafe_name = cafe["name"]
-        response = "カフェ名:" + cafe_name
+        cafe_url = cafe["url_mobile"]
+        response = "[カフェ名]" + cafe_name + "\n" + "[ぐるなびURL]" + cafe_url
       end
       case event
       when Line::Bot::Event::Message
