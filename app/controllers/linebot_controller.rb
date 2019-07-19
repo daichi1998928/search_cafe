@@ -46,19 +46,14 @@ class LinebotController < ApplicationController
         cafe_shuffles = cafes.shuffle
         cafe = cafe_shuffles.sample
 
-        cafe_name = cafe["name"]
-        cafe_url = cafe["url_mobile"]
-        response = "[カフェ名]" + cafe_name + "\n" + "[ぐるなびURL]" + cafe_url
+        flex_response = reply(cafe)
       end
       case event
       when Line::Bot::Event::Message
         case event.type
         when Line::Bot::Event::MessageType::Text
-          message = {
-            type: 'text',
-            text: response
-          }
-          client.reply_message(event['replyToken'], message)
+          
+          client.reply_message(event['replyToken'], flex_response)
         end
       end
     }
@@ -66,6 +61,147 @@ class LinebotController < ApplicationController
     head :ok
   end
 
+  def reply(cafe)
+    cafe_url = cafe["url_mobile"]
+    cafe_name = cafe["name"]
+    cafe_iamge = cafe["image_url"]["shop_image1"]
+    open_time = cafe["opentime"]
+    holiday = cafe["holiday"]
+    cafe_budget = cafe["budget"].to_s
+
+    if open_time.class != String #空いている時間と定休日の二つは空白の時にHashで返ってくるので、文字列に直そうとするとエラーになる。そのため、クラスによる場合分け。
+         open_time = ""
+      end
+    if holiday.class != String
+       holiday = ""
+     end
+    {
+      "type": "flex",
+      "altText": "this is a flex message",
+      "contents": {
+        "type": "bubble",
+        "hero": {
+          "type": "image",
+          "url": cafe_iamge,
+          "size": "full",
+          "aspectRatio": "20:13",
+          "aspectMode": "cover",
+          "action": {
+            "type": "uri",
+            "uri": "http://linecorp.com/"
+          }
+        },
+        "body": {
+          "type": "box",
+          "layout": "vertical",
+          "contents": [
+            {
+              "type": "text",
+              "text": cafe_name,
+              "weight": "bold",
+              "size": "lg"
+            },
+            {
+              "type": "box",
+              "layout": "vertical",
+              "margin": "lg",
+              "spacing": "md",
+              "contents": [
+                {
+                  "type": "box",
+                  "layout": "baseline",
+                  "spacing": "md",
+                  "contents": [
+                    {
+                      "type": "text",
+                      "text": "予算",
+                      "color": "#aaaaaa",
+                      "size": "md",
+                      "flex": 3
+                    },
+                    {
+                      "type": "text",
+                      "text": cafe_budget,
+                      "wrap": true,
+                      "color": "#666666",
+                      "size": "lg",
+                      "flex": 5
+                    }
+                  ]
+                },
+                {
+                  "type": "box",
+                  "layout": "baseline",
+                  "spacing": "md",
+                  "contents": [
+                    {
+                      "type": "text",
+                      "text": "定休日",
+                      "color": "#aaaaaa",
+                      "size": "md",
+                      "flex": 3
+                    },
+                    {
+                      "type": "text",
+                      "text": holiday,
+                      "wrap": true,
+                      "color": "#666666",
+                      "size": "md",
+                      "flex": 5
+                    }
+                  ]
+                },
+                {
+                  "type": "box",
+                  "layout": "baseline",
+                  "spacing": "md",
+                  "contents": [
+                    {
+                      "type": "text",
+                      "text": "開店時間",
+                      "color": "#aaaaaa",
+                      "size": "md",
+                      "flex": 3
+                    },
+                    {
+                      "type": "text",
+                      "text": open_time,
+                      "wrap": true,
+                      "color": "#666666",
+                      "size": "md",
+                      "flex": 5
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "footer": {
+          "type": "box",
+          "layout": "vertical",
+          "spacing": "sm",
+          "contents": [
+            {
+              "type": "button",
+              "style": "link",
+              "height": "sm",
+              "action": {
+                "type": "uri",
+                "label": "もっと詳しく！",
+                "uri": cafe_url
+              }
+            },
+            {
+              "type": "spacer",
+              "size": "sm"
+            }
+          ],
+          "flex": 0
+        }
+      }
+    }
+  end
 
 
 
