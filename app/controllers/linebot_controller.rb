@@ -47,13 +47,14 @@ class LinebotController < ApplicationController
         cafe = cafe_shuffles.sample
 
         flex_response = reply(cafe)
+        map_response = cafe_address(cafe)
       end
       case event
       when Line::Bot::Event::Message
         case event.type
         when Line::Bot::Event::MessageType::Text
-          
-          client.reply_message(event['replyToken'], flex_response)
+
+          client.reply_message(event['replyToken'], [flex_response,map_response])
         end
       end
     }
@@ -71,10 +72,10 @@ class LinebotController < ApplicationController
 
     if open_time.class != String #空いている時間と定休日の二つは空白の時にHashで返ってくるので、文字列に直そうとするとエラーになる。そのため、クラスによる場合分け。
          open_time = ""
-      end
+    end
     if holiday.class != String
        holiday = ""
-     end
+    end
     {
       "type": "flex",
       "altText": "this is a flex message",
@@ -203,6 +204,19 @@ class LinebotController < ApplicationController
     }
   end
 
+  def cafe_address(cafe)
+    cafe_name = cafe["name"]
+    cafe_address = cafe["address"]
+    cafe_latitude = cafe["latitude"]
+    cafe_longitude = cafe["longitude"]
+    {
+      "type": "location",
+      "title": cafe_name,
+      "address": cafe_address ,
+      "latitude": cafe_latitude,
+      "longitude": cafe_longitude
+    }
+   end
 
 
 
