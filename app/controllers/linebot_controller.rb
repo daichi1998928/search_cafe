@@ -29,32 +29,49 @@ class LinebotController < ApplicationController
     events = client.parse_events_from(body) #postされたbodyを配列形式で返してくれる
 
     events.each { |event|
-      address = event.message['text']
-      # area_result = `curl -X GET https://api.gnavi.co.jp/RestSearchAPI/v3/?keyid=52d46e2c5dcf3ceb3925d5fa4ec7615b&address=#{URI.encode(address)}&outret=1&wifi=1&freeword=#{URI.encode('カフェ')}`  #ここでぐるなびAPIを叩く
+      if event.message['text'] != nil
+        address = event.message['text']
+        key_id = ENV['ACCESS_KEY']
+        area_result = URI.parse("https://api.gnavi.co.jp/RestSearchAPI/v3/?keyid=#{key_id}&address=#{URI.encode(address)}&wifi=1&freeword=#{URI.encode('カフェ')}")
+        json_result = Net::HTTP.get(area_result)
+        hash_result = JSON.parse json_result
+      else
+        latitude = event.message['latitude']
+        longitude = event.message['longitude']
 
-      key_id = ENV['ACCESS_KEY']
-      area_result = URI.parse("https://api.gnavi.co.jp/RestSearchAPI/v3/?keyid=#{key_id}&address=#{URI.encode(address)}&wifi=1&freeword=#{URI.encode('カフェ')}")
-      json_result = Net::HTTP.get(area_result)
-      hash_result = JSON.parse json_result
+        key_id = ENV['ACCESS_KEY']
+        area_result = URI.parse("https://api.gnavi.co.jp/RestSearchAPI/v3/?keyid=#{key_id}&latitude=#{latitude}&longitude=#{longitude}&wifi=1&freeword=#{URI.encode('カフェ')}")
+        json_result = Net::HTTP.get(area_result)
+        hash_result = JSON.parse json_result
+      end
 
-      if hash_result["error"]
-        response = "#{address}付近にwifiと電源があるカフェがございません"
+      if hash_result.has_key?("error")
+        response = "送信していただいたエリアの付近にwifiがあるカフェをぐるなびから探すことはできませんでした。申し訳ございませんが他のツールをお使いください"
+        case event
+        when Line::Bot::Event::Message
+          case event.type
+          when Line::Bot::Event::MessageType::Text,Line::Bot::Event::MessageType::Location
+            message = {
+            type: 'text',
+            text: response
+          }
+             client.reply_message(event['replyToken'], [message])
+          end
+        end
       end
 
       if hash_result["rest"] #ここでお店情報が入った配列となる
         cafes = hash_result["rest"]
         cafe_shuffles = cafes.shuffle
         cafe = cafe_shuffles.sample
-
         flex_response = reply(cafe)
         map_response = cafe_address(cafe)
       end
       case event
       when Line::Bot::Event::Message
         case event.type
-        when Line::Bot::Event::MessageType::Text
-
-          client.reply_message(event['replyToken'], [flex_response,map_response])
+        when Line::Bot::Event::MessageType::Text,Line::Bot::Event::MessageType::Location
+           client.reply_message(event['replyToken'], [flex_response,map_response])
         end
       end
     }
@@ -65,7 +82,11 @@ class LinebotController < ApplicationController
   def reply(cafe)
     cafe_url = cafe["url_mobile"]
     cafe_name = cafe["name"]
-    cafe_iamge = cafe["image_url"]["shop_image1"]
+    if  cafe["image_url"]["shop_image1"].present?
+      cafe_image = cafe["image_url"]["shop_image1"]
+    else
+      cafe_image = "https://scdn.line-apps.com/n/channel_devcenter/img/fx/01_1_cafe.png"
+    end
     open_time = cafe["opentime"]
     holiday = cafe["holiday"]
     cafe_budget = cafe["budget"].to_s
@@ -83,7 +104,7 @@ class LinebotController < ApplicationController
         "type": "bubble",
         "hero": {
           "type": "image",
-          "url": cafe_iamge,
+          "url": cafe_image,
           "size": "full",
           "aspectRatio": "20:13",
           "aspectMode": "cover",
