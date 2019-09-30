@@ -67,7 +67,7 @@ class LinebotController < ApplicationController
         flex_response = reply(cafe)
         map_response = cafe_address(cafe)
       end
-      case event
+     case event
       when Line::Bot::Event::Message
         case event.type
         when Line::Bot::Event::MessageType::Text,Line::Bot::Event::MessageType::Location
