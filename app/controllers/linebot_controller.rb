@@ -29,24 +29,50 @@ class LinebotController < ApplicationController
     events = client.parse_events_from(body) #postされたbodyを配列形式で返してくれる
 
     events.each { |event|
-      if event.message['text'] != nil
+     if event.message['text'] != nil
         address = event.message['text']
-        key_id = ENV['ACCESS_KEY']
-        area_result = URI.parse("https://api.gnavi.co.jp/RestSearchAPI/v3/?keyid=#{key_id}&address=#{URI.encode(address)}&wifi=1&freeword=#{URI.encode('カフェ')}")
-        json_result = Net::HTTP.get(area_result)
-        hash_result = JSON.parse json_result
-      else
+        json_hash_result = search_from_text(address) 
+     else
         latitude = event.message['latitude']
         longitude = event.message['longitude']
+        json_hash_result = search_cafe_from_address(latitude,longitude)
+     end
 
-        key_id = ENV['ACCESS_KEY']
-        area_result = URI.parse("https://api.gnavi.co.jp/RestSearchAPI/v3/?keyid=#{key_id}&latitude=#{latitude}&longitude=#{longitude}&wifi=1&freeword=#{URI.encode('カフェ')}")
-        json_result = Net::HTTP.get(area_result)
-        hash_result = JSON.parse json_result
+     if json_hash_result.has_key?("error")
+        error_reply(event)
+        next
       end
 
-      if hash_result.has_key?("error")
-        response = "送信していただいたエリアの付近にwifiがあるカフェをぐるなびから探すことはできませんでした。申し訳ございませんが他のツールをお使いください"
+     if json_hash_result["rest"] #ここでお店情報が入った配列となる
+      cafes = json_hash_result["rest"]
+      cafe = cafes.shuffle.sample
+      flex_response = reply(cafe)
+      map_response = cafe_address(cafe)
+     end
+
+     success_reply(event,flex_response,map_response)
+    }
+
+    head :ok
+  end
+
+  private
+  def search_from_text(address)
+    key_id = ENV['ACCESS_KEY']
+    area_result = URI.parse("https://api.gnavi.co.jp/RestSearchAPI/v3/?keyid=#{key_id}&address=#{URI.encode(address)}&wifi=1&freeword=#{URI.encode('カフェ')}")
+    json_result = Net::HTTP.get(area_result)
+    hash_result = JSON.parse(json_result)
+  end
+  
+  def search_cafe_from_address(latitude,longitude)
+    key_id = ENV['ACCESS_KEY']
+    area_result = URI.parse("https://api.gnavi.co.jp/RestSearchAPI/v3/?keyid=#{key_id}&latitude=#{latitude}&longitude=#{longitude}&wifi=1&freeword=#{URI.encode('カフェ')}")
+    json_result = Net::HTTP.get(area_result)
+    hash_result = JSON.parse json_result
+  end
+
+  def error_reply(event)
+    response = "送信していただいたエリアの付近にwifiがあるカフェをぐるなびから探すことはできませんでした。申し訳ございませんが他のツールをお使いください"
         case event
         when Line::Bot::Event::Message
           case event.type
@@ -58,45 +84,21 @@ class LinebotController < ApplicationController
              client.reply_message(event['replyToken'], [message])
           end
         end
-      end
+  end
 
-      if hash_result["rest"] #ここでお店情報が入った配列となる
-        cafes = hash_result["rest"]
-        cafe_shuffles = cafes.shuffle
-        cafe = cafe_shuffles.sample
-        flex_response = reply(cafe)
-        map_response = cafe_address(cafe)
+  def success_reply(event,flex_response,map_response)
+    case event
+    when Line::Bot::Event::Message
+      case event.type
+      when Line::Bot::Event::MessageType::Text,Line::Bot::Event::MessageType::Location
+         client.reply_message(event['replyToken'], [flex_response,map_response])
       end
-     case event
-      when Line::Bot::Event::Message
-        case event.type
-        when Line::Bot::Event::MessageType::Text,Line::Bot::Event::MessageType::Location
-           client.reply_message(event['replyToken'], [flex_response,map_response])
-        end
-      end
-    }
+    end
 
-    head :ok
   end
 
   def reply(cafe)
-    cafe_url = cafe["url_mobile"]
-    cafe_name = cafe["name"]
-    if  cafe["image_url"]["shop_image1"].present?
-      cafe_image = cafe["image_url"]["shop_image1"]
-    else
-      cafe_image = "https://scdn.line-apps.com/n/channel_devcenter/img/fx/01_1_cafe.png"
-    end
-    open_time = cafe["opentime"]
-    holiday = cafe["holiday"]
-    cafe_budget = cafe["budget"].to_s
 
-    if open_time.class != String #空いている時間と定休日の二つは空白の時にHashで返ってくるので、文字列に直そうとするとエラーになる。そのため、クラスによる場合分け。
-         open_time = ""
-    end
-    if holiday.class != String
-       holiday = ""
-    end
     {
       "type": "flex",
       "altText": "this is a flex message",
@@ -104,7 +106,7 @@ class LinebotController < ApplicationController
         "type": "bubble",
         "hero": {
           "type": "image",
-          "url": cafe_image,
+          "url": cafe["image_url"]["shop_image1"].present? ? cafe["image_url"]["shop_image1"]:  "https://scdn.line-apps.com/n/channel_devcenter/img/fx/01_1_cafe.png",
           "size": "full",
           "aspectRatio": "20:13",
           "aspectMode": "cover",
@@ -119,7 +121,7 @@ class LinebotController < ApplicationController
           "contents": [
             {
               "type": "text",
-              "text": cafe_name,
+              "text": cafe["name"],
               "weight": "bold",
               "size": "lg"
             },
@@ -143,7 +145,7 @@ class LinebotController < ApplicationController
                     },
                     {
                       "type": "text",
-                      "text": cafe_budget,
+                      "text": cafe["budget"].to_s,
                       "wrap": true,
                       "color": "#666666",
                       "size": "lg",
@@ -165,7 +167,7 @@ class LinebotController < ApplicationController
                     },
                     {
                       "type": "text",
-                      "text": holiday,
+                      "text": cafe["holiday"].present? ? cafe["holiday"] : "",
                       "wrap": true,
                       "color": "#666666",
                       "size": "md",
@@ -187,7 +189,7 @@ class LinebotController < ApplicationController
                     },
                     {
                       "type": "text",
-                      "text": open_time,
+                      "text":  cafe["opentime"].present? ? cafe["opentime"] : "",
                       "wrap": true,
                       "color": "#666666",
                       "size": "md",
@@ -211,7 +213,7 @@ class LinebotController < ApplicationController
               "action": {
                 "type": "uri",
                 "label": "もっと詳しく！",
-                "uri": cafe_url
+                "uri": cafe["url_mobile"],
               }
             },
             {
@@ -226,16 +228,12 @@ class LinebotController < ApplicationController
   end
 
   def cafe_address(cafe)
-    cafe_name = cafe["name"]
-    cafe_address = cafe["address"]
-    cafe_latitude = cafe["latitude"]
-    cafe_longitude = cafe["longitude"]
     {
       "type": "location",
-      "title": cafe_name,
-      "address": cafe_address ,
-      "latitude": cafe_latitude,
-      "longitude": cafe_longitude
+      "title": cafe["name"],
+      "address": cafe["address"],
+      "latitude": cafe["latitude"],
+      "longitude": cafe["longitude"]
     }
    end
 
