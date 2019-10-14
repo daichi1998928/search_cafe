@@ -29,20 +29,23 @@ class LinebotController < ApplicationController
     events = client.parse_events_from(body) #postされたbodyを配列形式で返してくれる
 
     events.each { |event|
-      if event.message['text'] != nil
-        json_hash_result = search_from_text(event) 
-      else
-        json_hash_result = search_cafe_from_address(event)
-      end
+     if event.message['text'] != nil
+        address = event.message['text']
+        json_hash_result = search_from_text(address) 
+     else
+        latitude = event.message['latitude']
+        longitude = event.message['longitude']
+        json_hash_result = search_cafe_from_address(latitude,longitude)
+     end
 
-      if json_hash_result.has_key?("error")
+     if json_hash_result.has_key?("error")
         error_reply(event)
+        next
       end
 
      if json_hash_result["rest"] #ここでお店情報が入った配列となる
       cafes = json_hash_result["rest"]
-      cafe_shuffles = cafes.shuffle
-      cafe = cafe_shuffles.sample
+      cafe = cafes.shuffle.sample
       flex_response = reply(cafe)
       map_response = cafe_address(cafe)
      end
@@ -54,17 +57,14 @@ class LinebotController < ApplicationController
   end
 
   private
-  def search_from_text(event)
-    address = event.message['text']
+  def search_from_text(address)
     key_id = ENV['ACCESS_KEY']
     area_result = URI.parse("https://api.gnavi.co.jp/RestSearchAPI/v3/?keyid=#{key_id}&address=#{URI.encode(address)}&wifi=1&freeword=#{URI.encode('カフェ')}")
     json_result = Net::HTTP.get(area_result)
     hash_result = JSON.parse(json_result)
   end
   
-  def search_cafe_from_address(event)
-    latitude = event.message['latitude']
-    longitude = event.message['longitude']
+  def search_cafe_from_address(latitude,longitude)
     key_id = ENV['ACCESS_KEY']
     area_result = URI.parse("https://api.gnavi.co.jp/RestSearchAPI/v3/?keyid=#{key_id}&latitude=#{latitude}&longitude=#{longitude}&wifi=1&freeword=#{URI.encode('カフェ')}")
     json_result = Net::HTTP.get(area_result)
