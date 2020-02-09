@@ -25,7 +25,7 @@ class LinebotController < ApplicationController
       head :bad_request
       #ステータスコードを表示する
     end
-    binding.pry
+   
     events = client.parse_events_from(body) #postされたbodyを配列形式で返してくれる
 
     events.each { |event|
